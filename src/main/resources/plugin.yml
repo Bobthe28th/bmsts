@@ -1,0 +1,10 @@
+name: bmsts
+version: 0.1
+author: Bobthe28th
+main: me.bobthe28th.bmsts.Main
+description: deez
+api-version: 1.19
+commands:
+  jointeam:
+    description: Joins a game team
+    usage: /<command> team
