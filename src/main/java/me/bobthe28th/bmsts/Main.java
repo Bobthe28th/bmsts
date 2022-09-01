@@ -1,7 +1,9 @@
 package me.bobthe28th.bmsts;
 
+import me.bobthe28th.bmsts.gamebase.GameMap;
 import me.bobthe28th.bmsts.gamebase.GamePlayer;
 import me.bobthe28th.bmsts.gamebase.GameTeam;
+import me.bobthe28th.bmsts.gamebase.bonusrounds.BonusRound;
 import me.bobthe28th.bmsts.gamebase.minions.*;
 import net.minecraft.world.entity.Entity;
 import org.bukkit.*;
@@ -39,6 +41,12 @@ public class Main extends JavaPlugin implements Listener {
 
     FileConfiguration config = getConfig();
 
+    static int round = 1;
+    GameMap[] gameMaps;
+    static GameMap currentMap;
+
+    public static BonusRound currentBonusRound;
+
     @Override
     public void onEnable() {
 
@@ -74,11 +82,17 @@ public class Main extends JavaPlugin implements Listener {
 
         World w = getServer().getWorld("world");
         Location[] l = new Location[]{new Location(w,261, 95, -234),new Location(w,267, 95, -234),new Location(w,273, 95, -234),new Location(w,279, 95, -234)};
-        gameTeams.put("blue",new GameTeam("blue", Color.BLUE,ChatColor.BLUE, ChatColor.DARK_BLUE, this, new Location(getServer().getWorld("world"), 284, 95, -228),new Location(getServer().getWorld("world"), 284, 95, -225), Arrays.asList(l), new Location(w,284, 95, -230), new Location(w,242, 95, -227), new Location(w,279, 95, -223)));
+        gameTeams.put("blue",new GameTeam("blue", Color.BLUE,ChatColor.BLUE, ChatColor.DARK_BLUE, this, new Location(w, 259, 95, -227, -90, 0), new Location(getServer().getWorld("world"), 284, 95, -228),new Location(getServer().getWorld("world"), 284, 95, -225), Arrays.asList(l), new Location(w,284, 95, -230), new Location(w,279, 95, -223)));
         for (Location s : l) {
             s.add(0,0,-17);
         }
-        gameTeams.put("red",new GameTeam("red", Color.RED,ChatColor.RED, ChatColor.DARK_RED, this, new Location(getServer().getWorld("world"), 284, 95, -245),new Location(getServer().getWorld("world"), 284, 95, -242), Arrays.asList(l), new Location(w,284, 95, -247), new Location(w,252, 95, -252), new Location(w,279, 95, -240)));
+        gameTeams.put("red",new GameTeam("red", Color.RED,ChatColor.RED, ChatColor.DARK_RED, this, new Location(w, 259, 95, -244, -90, 0), new Location(getServer().getWorld("world"), 284, 95, -245),new Location(getServer().getWorld("world"), 284, 95, -242), Arrays.asList(l), new Location(w,284, 95, -247), new Location(w,279, 95, -240)));
+
+        HashMap<GameTeam,Location> minionSpawn = new HashMap<>();
+        minionSpawn.put(gameTeams.get("blue"),new Location(w, 243, 95, -228));
+        minionSpawn.put(gameTeams.get("red"),new Location(w, 251, 95, -251));
+        gameMaps = new GameMap[]{new GameMap("temp", new Location(w,247, 101, -240), minionSpawn)};
+        currentMap = gameMaps[0];
 
         //Update players
         for (Player p : Bukkit.getOnlinePlayers()) {
@@ -91,6 +105,21 @@ public class Main extends JavaPlugin implements Listener {
         for (GameTeam team : gameTeams.values()) {
             team.removeMinions();
         }
+        if (currentBonusRound != null && currentBonusRound.isRunning()) {
+            currentBonusRound.end(false);
+        }
+    }
+
+    public static GameMap getCurrentMap() {
+        return currentMap;
+    }
+
+    public static void setRound(int round) {
+        Main.round = round;
+    }
+
+    public static int getRound() {
+        return round;
     }
 
     public static String getHealthString(double health, ChatColor fullColor, ChatColor halfColor) {

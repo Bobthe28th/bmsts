@@ -49,6 +49,10 @@ public class GamePlayer implements Listener {
         }
     }
 
+    public Player getPlayer() {
+        return player;
+    }
+
     public GameTeam getTeam() {
         return team;
     }

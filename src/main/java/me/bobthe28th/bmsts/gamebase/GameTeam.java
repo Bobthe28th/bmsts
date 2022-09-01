@@ -1,6 +1,7 @@
 package me.bobthe28th.bmsts.gamebase;
 
 import me.bobthe28th.bmsts.Main;
+import me.bobthe28th.bmsts.gamebase.bonusrounds.survive.SurviveRound;
 import me.bobthe28th.bmsts.gamebase.minions.Minion;
 import me.bobthe28th.bmsts.gamebase.minions.Rarity;
 import me.bobthe28th.bmsts.gamebase.minions.SilverfishMinion;
@@ -17,12 +18,13 @@ public class GameTeam {
     Main plugin;
     Team team;
     boolean ready = false;
+    boolean dead = false;
 
     //Locations
+    Location playerSpawn;
     Location randomizer;
     Location techUpgrade;
     List<Location> spawners = new ArrayList<>();
-    Location spawn;
     Location minionItemSpawn;
     Location readySwitch;
 
@@ -35,14 +37,14 @@ public class GameTeam {
 
     int researchPoints = 400;
 
-    public GameTeam(String name, Color bColor, ChatColor color, ChatColor darkColor, Main plugin, Location randomizer, Location techUpgrade, List<Location> spawners, Location readySwitch, Location spawn, Location minionItemSpawn) {
+    public GameTeam(String name, Color bColor, ChatColor color, ChatColor darkColor, Main plugin, Location playerSpawn, Location randomizer, Location techUpgrade, List<Location> spawners, Location readySwitch, Location minionItemSpawn) {
         this.plugin = plugin;
+        this.playerSpawn = playerSpawn.clone();
         this.randomizer = randomizer.clone();
         this.techUpgrade = techUpgrade.clone();
         for (Location l : spawners) {
             this.spawners.add(l.clone());
         }
-        this.spawn = spawn.clone();
         this.bColor = bColor;
         this.color = color;
         this.darkColor = darkColor;
@@ -78,6 +80,48 @@ public class GameTeam {
         minions.clear();
     }
 
+    public void minionDeath() {
+        for (Minion m : minions) {
+            if (m.getEntities().size() != 0) return;
+        }
+        dead = true;
+        Bukkit.broadcastMessage(ChatColor.GRAY + "[" + team.getColor() + "☠" + ChatColor.GRAY + "] " + team.getColor() + team.getDisplayName() + " dead");
+        for (GamePlayer p : Main.gamePlayers.values()) {
+            p.getPlayer().sendTitle("",team.getColor() + team.getDisplayName() + " dead",10,20,10);
+        }
+        GameTeam winner = null;
+        for (GameTeam t : Main.gameTeams.values()) {
+            if (!t.isDead()) {
+                if (winner == null) {
+                    winner = t;
+                } else {
+                    return;
+                }
+            }
+        }
+        if (winner != null) {
+            for (GameTeam t : Main.gameTeams.values()) {
+                t.removeEntities();
+            }
+            Bukkit.broadcastMessage(ChatColor.GRAY + "[" + winner.getTeam().getColor() + "✪" + ChatColor.GRAY + "] " + winner.getTeam().getColor() + winner.getTeam().getDisplayName() + " won the round");
+            for (GamePlayer p : Main.gamePlayers.values()) {
+                p.getPlayer().sendTitle("", winner.getTeam().getColor() + winner.getTeam().getDisplayName() + " won the round", 10, 20, 10);
+                p.getPlayer().teleport(p.getTeam().getPlayerSpawn().clone().add(0.5,0,0.5));
+            }
+            Main.setRound(Main.getRound() + 1);
+            if (Main.getRound() % 2 == 1) {
+                Main.currentBonusRound = new SurviveRound(plugin);
+                Main.currentBonusRound.start();
+            }
+        }
+    }
+
+    public void removeEntities() {
+        for (Minion m : minions) {
+            m.removeEntities();
+        }
+    }
+
     public void addMinion(Minion m) {
         minions.add(m);
     }
@@ -86,14 +130,21 @@ public class GameTeam {
         minions.remove(m);
     }
 
+    public boolean isDead() {
+        return dead;
+    }
+
     public boolean isReady() {
         return ready;
     }
 
     public void spawnAll(Location l) {
+        if (minions.size() > 0) {
+            dead = false;
+        }
         for (Minion m : minions) {
             if (m.getPlacedLoc() != null && spawners.contains(m.getPlacedLoc())) {
-                m.spawnGroup(l);
+                m.spawnGroup(l); //TODO suffocate
             }
         }
     }
@@ -130,32 +181,50 @@ public class GameTeam {
 
     public void setReady(boolean ready) {
         this.ready = ready;
-        boolean allReady = true;
-        for (GameTeam g : Main.gameTeams.values()) {
-            if (!g.isReady()) {
-                allReady = false;
-                break;
+        if (ready) {
+            boolean allReady = true;
+            Bukkit.broadcastMessage(ChatColor.GRAY + "[" + team.getColor() + "✔" + ChatColor.GRAY + "] " + team.getColor() + team.getDisplayName() + " ready");
+            for (GamePlayer p : Main.gamePlayers.values()) {
+                p.getPlayer().sendTitle("", team.getColor() + team.getDisplayName() + " ready", 10, 20, 10);
             }
-        }
-        if (allReady) {
             for (GameTeam g : Main.gameTeams.values()) {
-                g.spawnAll(g.getSpawn());
-                g.dropKept();
-//                g.showTargets();
+                if (!g.isReady()) {
+                    allReady = false;
+                    break;
+                }
+            }
+            if (allReady) {
+
+                for (GameTeam g : Main.gameTeams.values()) {
+                    g.dropKept();
+                    g.setReady(false);
+                }
+
+                for (GamePlayer p : Main.gamePlayers.values()) {
+                    p.getPlayer().teleport(Main.getCurrentMap().getPlayerSpawn().clone().add(0.5, 0, 0.5));
+                }
+                new BukkitRunnable() {
+                    @Override
+                    public void run() {
+                        for (GameTeam g : Main.gameTeams.values()) {
+                            g.spawnAll(Main.getCurrentMap().getMinionSpawn().get(g));
+                            if (g.getReadySwitch().getBlock().getType() == Material.LEVER) {
+                                g.getReadySwitch().getBlock().setBlockData(g.getReadySwitch().getBlock().getBlockData().merge(Bukkit.getServer().createBlockData("minecraft:lever[powered=false]")));
+                            }
+//                        g.showTargets();
+                        }
+                    }
+                }.runTaskLater(plugin, 40);
             }
         }
     }
 
-    public Location getMinionItemSpawn() {
-        return minionItemSpawn;
+    public Location getPlayerSpawn() {
+        return playerSpawn;
     }
 
     public Location getReadySwitch() {
         return readySwitch;
-    }
-
-    public Location getSpawn() {
-        return spawn;
     }
 
     public Team getTeam() {

@@ -206,6 +206,15 @@ public abstract class Minion implements Listener {
         }
     }
 
+    public void removeEntities() {
+        if (entities.size() > 0) {
+            for (LivingEntity e : entities) {
+                e.remove(Entity.RemovalReason.DISCARDED);
+            }
+        }
+        entities.clear();
+    }
+
     public void remove(boolean fromList) {
         if (itemStack != null) {
             for (Player p : Bukkit.getOnlinePlayers()) {
@@ -228,12 +237,19 @@ public abstract class Minion implements Listener {
         }
     }
 
+    public ArrayList<Mob> getEntities() {
+        return entities;
+    }
+
     @EventHandler
     public void onEntityDamage(EntityDamageEvent event) {
-        if (event.getEntity() instanceof org.bukkit.entity.LivingEntity l && entities.contains(((CraftMob)l).getHandle())) {
+        if (event.getEntity() instanceof org.bukkit.entity.LivingEntity l && l instanceof CraftMob && entities.contains(((CraftMob)l).getHandle())) {
             if (l.getHealth() - event.getDamage() <= 0) {
                 entities.remove(((CraftMob)l).getHandle());
                 l.setCustomName(ChatColor.WHITE + "☠");
+                if (entities.size() == 0) {
+                    team.minionDeath();
+                }
             } else {
                 l.setCustomName(Main.getHealthString(l.getHealth() - event.getDamage(), team.getColor(), team.getDarkColor()));
             }
